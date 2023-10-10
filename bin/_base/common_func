@@ -1,0 +1,75 @@
+
+resolve_namespace_and_res_name() {
+  local action="$@"
+  local res_info_header=$(kubectl get $type -A 2> /dev/null |grep 'NAMESPACE ')
+  
+  local type_support_namespace=1
+  if [ "$res_info_header" == "" ]; then
+    type_support_namespace=0
+    res_info_header=$(kubectl get $type -A 2> /dev/null |grep 'NAME ')
+  fi
+  
+  local res_info_command="kubectl get $type -A 2> /dev/null |grep \"$name\""
+  local res_info_count=$(eval $res_info_command | wc -l)
+
+  if [ $res_info_count -eq 0 ]; then
+    echo -e "\n=== No ${type}s with '$name' in the name were found.\n"
+    exit 1
+  elif [ $res_info_count -gt 1 ]; then
+    echo -e "\n=== Found $res_info_count ${type}s with '$name' in their names: \n"
+    echo "    $res_info_header"
+    eval $res_info_command | nl -w2 -s ': ' |grep --color=always $name
+    
+    echo ""
+    while : ; do
+      read -p "=== Please choose one $type to $action [1~$res_info_count] or type 'q' to quit: " res_info_sequnce
+      if [ "$res_info_sequnce" == "q" ]; then
+        echo ""
+        exit 0
+      elif [[ $res_info_sequnce =~ ^[1-9][0-9]*$ ]] && [ $res_info_sequnce -le $res_info_count ]; then
+        break
+      fi
+    done
+    
+    local filtered_line=$(eval $res_info_command | nl -w2 -s ': ' |grep $name |grep "${res_info_sequnce}: ")
+    if [ $type_support_namespace -eq 1 ]; then
+      namespace=$(echo $filtered_line |awk '{print $2}')
+      res_name=$(echo $filtered_line |awk '{print $3}')
+    else
+      res_name=$(echo $filtered_line |awk '{print $2}')
+    fi
+    echo ""
+  else
+    echo -e "\n=== Found 1 ${type} with '$name' in its name: \n"
+    echo "$res_info_header"
+    eval $res_info_command |grep --color=always "$name"
+    
+    echo ""
+    while : ; do
+      read -n1 -p "=== Do you want to $action [y/n]? : " whether_continue
+      case $whether_continue in 
+        Y|y) 
+            echo ""
+            break
+            ;;
+        N|n) 
+            echo -e "\n"
+            exit 0
+            ;;
+        *) 
+            echo ""
+            ;;
+      esac
+    done
+    
+    local filtered_line=$(eval $res_info_command |grep $name)
+    if [ $type_support_namespace -eq 1 ]; then
+      namespace=$(echo $filtered_line |awk '{print $1}')
+      res_name=$(echo $filtered_line |awk '{print $2}')
+    else
+      res_name=$(echo $filtered_line |awk '{print $1}')
+    fi
+    
+    echo ""
+  fi
+}

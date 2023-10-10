@@ -1,0 +1,6 @@
+out/
+release.sh
+reset.sh
+update-author.sh
+update-version.sh
+update-date.sh
