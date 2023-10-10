@@ -21,7 +21,7 @@ print_usage() {
   echo "# View logs of svc by specified name (as keyword to search svc name)"
   echo "# "
   echo "# @author bianyun"
-  echo "# @version 1.0.0"
+  echo "# @version 1.1.0-SNAPSHOT"
   echo "# @date 2023/10/10"
   echo "====================================================================="
   echo ""

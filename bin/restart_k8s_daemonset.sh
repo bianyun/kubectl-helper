@@ -21,7 +21,7 @@ print_usage() {
   echo "# Restart k8s daemonset by specified name (as keyword to search daemonset name)"
   echo "# "
   echo "# @author bianyun"
-  echo "# @version 1.0.0"
+  echo "# @version 1.1.0-SNAPSHOT"
   echo "# @date 2023/10/10"
   echo "==============================================================================="
   echo ""

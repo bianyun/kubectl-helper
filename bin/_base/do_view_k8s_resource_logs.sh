@@ -24,7 +24,7 @@ print_usage() {
   echo "# View logs of k8s resource by specified type and name (as keyword to search resource name)"
   echo "# "
   echo "# @author bianyun"
-  echo "# @version 1.0.0"
+  echo "# @version 1.1.0-SNAPSHOT"
   echo "# @date 2023/10/10"
   echo "============================================================================================"
   echo ""
