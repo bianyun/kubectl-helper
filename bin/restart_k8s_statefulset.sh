@@ -21,7 +21,7 @@ print_usage() {
   echo "# Restart k8s statefulset by specified name (as keyword to search statefulset name)"
   echo "# "
   echo "# @author bianyun"
-  echo "# @version 1.0.0-SNAPSHOT"
+  echo "# @version 1.0.0"
   echo "# @date 2023/10/10"
   echo "==================================================================================="
   echo ""

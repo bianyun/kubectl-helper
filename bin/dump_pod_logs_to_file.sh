@@ -23,7 +23,7 @@ print_usage() {
   echo "# Dump pod logs to file by specified name (as keyword to search pod name)"
   echo "# "
   echo "# @author bianyun"
-  echo "# @version 1.0.0-SNAPSHOT"
+  echo "# @version 1.0.0"
   echo "# @date 2023/10/10"
   echo "=========================================================================="
   echo ""

@@ -24,7 +24,7 @@ print_usage() {
   echo "# Enter k8s pod by specified name (as keyword to search pod name)"
   echo "# "
   echo "# @author bianyun"
-  echo "# @version 1.0.0-SNAPSHOT"
+  echo "# @version 1.0.0"
   echo "# @date 2023/10/10"
   echo "=================================================================="
   echo ""
