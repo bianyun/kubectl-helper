@@ -1,15 +1,22 @@
 
 resolve_namespace_and_res_name() {
   local action="$@"
-  local res_info_header=$(kubectl get $type -A 2> /dev/null |grep 'NAMESPACE ')
+  
+  local cmd_str="kubectl get $type -A"
+  
+  if [[ "$type" =~ ^(pod|pods)$ ]]; then
+    cmd_str="${cmd_str} -o wide"
+  fi
+  
+  local res_info_header=$(eval $cmd_str 2> /dev/null |grep 'NAMESPACE ')
   
   local type_support_namespace=1
   if [ "$res_info_header" == "" ]; then
     type_support_namespace=0
-    res_info_header=$(kubectl get $type -A 2> /dev/null |grep 'NAME ')
+    res_info_header=$(eval $cmd_str 2> /dev/null |grep 'NAME ')
   fi
   
-  local res_info_command="kubectl get $type -A 2> /dev/null |grep \"$name\""
+  local res_info_command="$cmd_str 2> /dev/null |grep \"$name\""
   local res_info_count=$(eval $res_info_command | wc -l)
 
   if [ $res_info_count -eq 0 ]; then

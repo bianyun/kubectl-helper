@@ -16,6 +16,8 @@ SCRIPT_NAME=$(basename $SCRIPT_PATH)
 
 # include common func
 source $SCRIPT_DIR/common_func
+# include common config
+source $SCRIPT_DIR/common_config
 
 
 print_usage() {
@@ -25,7 +27,7 @@ print_usage() {
   echo "# "
   echo "# @author bianyun"
   echo "# @version 1.1.0-SNAPSHOT"
-  echo "# @date 2023/10/10"
+  echo "# @date 2023/11/3"
   echo "======================================================================================"
   echo ""
   echo "Usage:"
@@ -46,7 +48,6 @@ print_usage() {
 #===================================
 # script entry point
 #===================================
-allow_restart_kube_system_resource="false"
 
 type=$1
 name=$2
@@ -63,13 +64,25 @@ if [ $# -eq 2 ] && [ "$2" == "all" ]; then
   print_usage && exit 1
 fi
 
+
+if [[ "$type" =~ ^(deploy|deployment|deployments)$ ]]; then
+  type="deployment"
+elif [[ "$type" =~ ^(ds|daemonset|daemonsets)$ ]]; then
+  type="daemonset"
+elif [[ "$type" =~ ^(sts|statefulset|statefulsets)$ ]]; then
+  type="statefulset"
+else
+  echo -e "[ERROR] Unsupported k8s resource type for restart: [$1]\n" && exit 1
+fi
+
+
 if [ $# -eq 3 ]; then
   namespace=$3
   kubectl get ns $namespace > /dev/null 2>&1
   if [ $? -ne 0 ]; then
     valid_namespaces=$(kubectl get ns | awk 'NR>1' | awk '{print $1}' |tr '\n' ' ')
     echo -e "[ERROR] Invalid namespace [$namespace], valid namespaces are as follows:"
-    echo "          $valid_namespaces"
+    echo "        [ $valid_namespaces ]"
     echo "" && exit 1
   fi
   
@@ -77,7 +90,18 @@ if [ $# -eq 3 ]; then
     echo -e "=== [WARN] Do not allow restarting of ${type}s under namespace [kube-system]\n" && exit 1
   fi
   
-  kubectl get $type -n $namespace | awk 'NR>1' | awk '{print $1}' | xargs -I {} kubectl rollout restart $type -n $namespace {}
+  cmd_str="kubectl get $type | awk 'NR>1' | awk '{print $1}' | xargs -I {} kubectl rollout restart $type {}"
+
+  if [ "$namespace" != "default" ]; then
+    cmd_str="kubectl get $type -n $namespace | awk 'NR>1' | awk '{print \$1}' | xargs -I {} kubectl rollout restart $type -n $namespace {}"
+  fi
+
+  echo -e "=== [DEBUG] About to execute command after 3 seconds: [ $cmd_str ]\n"
+  echo "--------------------------------- Command execution result ----------------------------------"
+  echo ""
+
+  sleep 3
+  eval $cmd_str
   exit 0
 fi
 
@@ -90,4 +114,17 @@ if [ $namespace == "kube-system" ] && [ $allow_restart_kube_system_resource != "
   echo -e "=== [WARN] Do not allow restarting of ${type}s under namespace [kube-system]\n" && exit 1
 fi
 
-kubectl rollout restart -n $namespace $type/$res_name && echo ""
+cmd_str="kubectl rollout restart"
+
+if [ "$namespace" != "default" ]; then
+  cmd_str="$cmd_str -n $namespace"
+fi
+
+cmd_str="$cmd_str $type/$res_name"
+
+echo -e "=== [DEBUG] About to execute command after 3 seconds: [ $cmd_str ]\n"
+echo "--------------------------------- Command execution result ----------------------------------"
+echo ""
+
+sleep 3
+eval $cmd_str

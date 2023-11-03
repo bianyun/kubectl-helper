@@ -1,4 +1,5 @@
-out/
+release/
+_out/
 release.sh
 reset.sh
 update-author.sh

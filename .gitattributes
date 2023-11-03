@@ -1,5 +1,6 @@
 # Declare files that will always have CRLF line endings on checkout.
-*.sh        text eol=lf
-*.md        text eol=lf
-common_func text eol=lf
-version     text eol=lf
+*.sh          text eol=lf
+*.md          text eol=lf
+common_func   text eol=lf
+common_config text eol=lf
+version       text eol=lf

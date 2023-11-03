@@ -14,8 +14,10 @@ cd "$(dirname "${SCRIPT_PATH}")" > /dev/null || { echo "=== ERROR: failed to cha
 SCRIPT_DIR=$(pwd)
 SCRIPT_NAME=$(basename $SCRIPT_PATH)
 
-# include common func
+# include common functions
 source $SCRIPT_DIR/common_func
+# include common config
+source $SCRIPT_DIR/common_config
 
 
 print_usage() {
@@ -25,20 +27,26 @@ print_usage() {
   echo "# "
   echo "# @author bianyun"
   echo "# @version 1.1.0-SNAPSHOT"
-  echo "# @date 2023/10/10"
+  echo "# @date 2023/11/3"
   echo "============================================================================================"
   echo ""
   echo "Usage:"
-  echo "  ./$SCRIPT_NAME <type> <name>"
+  echo "  ./$SCRIPT_NAME <type> <name> [tail_lines_count]"
+  echo ""
+  echo "Note:"
+  echo "  Default value of optional parameter 'tail_lines_count': $default_tail_lines_count_for_view_logs"
   echo ""
   echo "Examples:"
-  echo "  ./$SCRIPT_NAME node 10.1.76.1"
-  echo "  ./$SCRIPT_NAME pv uds-es"
-  echo "  ./$SCRIPT_NAME pvc uds-es"
-  echo "  ./$SCRIPT_NAME pod nacos"
-  echo "  ./$SCRIPT_NAME svc redis"
-  echo "  ./$SCRIPT_NAME endpoints uds-es"
-  echo "  ./$SCRIPT_NAME deployment uds-es"
+  echo "  ./$SCRIPT_NAME pod uds-es"
+  echo "  ./$SCRIPT_NAME pods uds-es"
+  echo "  ./$SCRIPT_NAME svc uds-es"
+  echo "  ./$SCRIPT_NAME service uds-es"
+  echo "  ./$SCRIPT_NAME services uds-es"
+  echo "  ./$SCRIPT_NAME deploy job-executor"
+  echo "  ./$SCRIPT_NAME deployment job-executor"
+  echo "  ./$SCRIPT_NAME deployments job-executor"
+  echo "  ./$SCRIPT_NAME pod uds-es 50"
+  echo "  ./$SCRIPT_NAME pod uds-es 2000"
   echo ""
 }
 
@@ -47,12 +55,30 @@ print_usage() {
 # script entry point
 #===================================
 
-type=$1
+type=${1,,}
 name=$2
 
-if [ $# -ne 2 ] || [[ ! "$type" =~ ^(pod|svc|deploy|deployment)$ ]]; then
-  print_usage
-  exit 1
+[ $# -lt 2 -o $# -gt 3 ] && print_usage && exit 1
+
+tail_lines_count=$default_tail_lines_count_for_view_logs
+
+if [ $# -eq 3 ]; then
+  if [[ ! $3 =~ ^[1-9][0-9]*$ ]]; then
+    echo -e "[ERROR] Illegal argument 'tail_lines_count': [$3]\n" && exit 1
+  else
+    tail_lines_count=$3
+  fi
+fi
+
+
+if [[ "$type" =~ ^(pod|pods)$ ]]; then
+  type="pod"
+elif [[ "$type" =~ ^(svc|service|services)$ ]]; then
+  type="service"
+elif [[ "$type" =~ ^(deploy|deployment|deployments)$ ]]; then
+  type="deployment"
+else
+  echo -e "[ERROR] Unsupported k8s resource type for view logs: [$1]\n" && exit 1
 fi
 
 namespace="default"
@@ -60,4 +86,22 @@ res_name=$name
 
 resolve_namespace_and_res_name "view its logs"
 
-kubectl logs -n $namespace -f --tail 5000 $type/$res_name
+cmd_str="kubectl logs"
+
+if [ "$namespace" != "default" ]; then
+  cmd_str="$cmd_str -n $namespace"
+fi
+
+if [[ "$type" =~ ^(service|deployment)$ ]]; then
+  cmd_str="${cmd_str} --prefix=true -f --tail=$tail_lines_count $type/$res_name"
+elif [ "$type" == "pod" ]; then
+  cmd_str="${cmd_str} -f --tail=$tail_lines_count $res_name"
+fi
+
+echo -e "=== [DEBUG] About to execute command after 3 seconds: [ $cmd_str ]\n"
+echo "--------------------------------- Command execution result ----------------------------------"
+echo ""
+
+sleep 3
+
+eval $cmd_str

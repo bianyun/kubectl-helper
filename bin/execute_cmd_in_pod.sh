@@ -25,16 +25,19 @@ print_usage() {
   echo "# "
   echo "# @author bianyun"
   echo "# @version 1.1.0-SNAPSHOT"
-  echo "# @date 2023/10/10"
+  echo "# @date 2023/11/3"
   echo "==============================================================================="
   echo ""
   echo "Usage:"
-  echo "  ./$SCRIPT_NAME <name> <command>"
+  echo "  ./$SCRIPT_NAME <name> <\"command_str\">"
   echo ""
   echo "Examples:"
-  echo "  ./$SCRIPT_NAME nacos date"
-  echo "  ./$SCRIPT_NAME redis ls -l /usr"
-  echo "  ./$SCRIPT_NAME uds-es cat /etc/hosts"
+  echo "  ./$SCRIPT_NAME uds-es \"date +'%Y-%m-%d %H:%M:%S'\""
+  echo "  ./$SCRIPT_NAME uds-es \"cat /etc/os-release\""
+  echo "  ./$SCRIPT_NAME uds-es \"cat /etc/hosts |grep 127.0.0.1\""
+  echo "  ./$SCRIPT_NAME uds-es \"ls -l /usr\""
+  echo "  ./$SCRIPT_NAME uds-es \"ls -l --color=auto / |grep usr\""
+  echo "  ./$SCRIPT_NAME uds-es \"ps -ef |grep -v share\""
   echo ""
 }
 
@@ -56,6 +59,16 @@ res_name=$name
 
 resolve_namespace_and_res_name "execute your command"
 
-kubectl exec $type/$res_name -n $namespace -it -- $command
+cmd_str="kubectl exec -it"
 
+if [ "$namespace" != "default" ]; then
+  cmd_str="$cmd_str -n $namespace"
+fi
+
+cmd_str="$cmd_str $res_name -- $command"
+
+echo -e "=== [DEBUG] About to execute command: [ $cmd_str ]\n"
+echo "--------------------------------- Command execution result ----------------------------------"
 echo ""
+
+eval $cmd_str && echo ""

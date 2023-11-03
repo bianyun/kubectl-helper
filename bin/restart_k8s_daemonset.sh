@@ -22,7 +22,7 @@ print_usage() {
   echo "# "
   echo "# @author bianyun"
   echo "# @version 1.1.0-SNAPSHOT"
-  echo "# @date 2023/10/10"
+  echo "# @date 2023/11/3"
   echo "==============================================================================="
   echo ""
   echo "Usage:"

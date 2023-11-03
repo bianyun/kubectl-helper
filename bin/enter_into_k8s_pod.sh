@@ -25,7 +25,7 @@ print_usage() {
   echo "# "
   echo "# @author bianyun"
   echo "# @version 1.1.0-SNAPSHOT"
-  echo "# @date 2023/10/10"
+  echo "# @date 2023/11/3"
   echo "=================================================================="
   echo ""
   echo "Usage:"
@@ -53,10 +53,25 @@ res_name=$name
 
 resolve_namespace_and_res_name "enter in it"
 
-kubectl exec $type/$res_name -n $namespace -it -- which bash  >/dev/null 2>&1
+cmd_str="kubectl exec -it"
 
-if [ $? -eq 0 ]; then
-  kubectl exec $type/$res_name -n $namespace -it -- bash
-else
-  kubectl exec $type/$res_name -n $namespace -it -- sh
+if [ "$namespace" != "default" ]; then
+  cmd_str="$cmd_str -n $namespace"
 fi
+
+cmd_str="$cmd_str $res_name"
+
+kubectl exec $res_name -n $namespace -i -- sh -c 'which bash || type bash' >/dev/null 2>&1
+exit_code=$?
+
+if [ $exit_code -eq 0 ]; then
+  cmd_str="$cmd_str -- bash"
+else
+  cmd_str="$cmd_str -- sh"
+fi
+
+echo -e "=== [DEBUG] About to execute command: [ $cmd_str ]\n"
+echo "------------------------- NOTE: The part below is inside the container --------------------------"
+echo ""
+
+eval $cmd_str && echo ""
