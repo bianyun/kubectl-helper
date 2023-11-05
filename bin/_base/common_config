@@ -1,4 +1,6 @@
 
-default_tail_lines_count_for_view_logs=500
-default_tail_lines_count_for_dump_logs=500000
+debug="false"
+global_out_dir_name="_out"
+default_tail_size_for_logs_view=500
+default_tail_size_for_logs_dump=500000
 allow_restart_kube_system_resource="false"

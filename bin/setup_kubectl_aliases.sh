@@ -17,13 +17,13 @@ SCRIPT_NAME=$(basename $SCRIPT_PATH)
 
 print_usage() {
   echo ""
-  echo "============================================"
-  echo "# Setup aliases for common kubectl commands"
+  echo "====================================================="
+  echo "# Setup aliases for most common used kubectl commands"
   echo "# "
   echo "# @author bianyun"
   echo "# @version 1.1.0-SNAPSHOT"
-  echo "# @date 2023/11/3"
-  echo "============================================"
+  echo "# @date 2023/11/7"
+  echo "====================================================="
   echo ""
   echo "Usage:"
   echo "  ./$SCRIPT_NAME <init|list>"
@@ -44,9 +44,9 @@ print_usage() {
 }
 
 
-#===================================
+#====================
 # script entry point
-#===================================
+#====================
 
 [ $# -lt 1 -o $# -gt 2 ] && print_usage && exit 1
 

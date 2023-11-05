@@ -1,82 +1,593 @@
+#!/usr/bin/env bash
 
-resolve_namespace_and_res_name() {
-  local action="$@"
-  
-  local cmd_str="kubectl get $type -A"
-  
-  if [[ "$type" =~ ^(pod|pods)$ ]]; then
-    cmd_str="${cmd_str} -o wide"
-  fi
-  
-  local res_info_header=$(eval $cmd_str 2> /dev/null |grep 'NAMESPACE ')
-  
-  local type_support_namespace=1
-  if [ "$res_info_header" == "" ]; then
-    type_support_namespace=0
-    res_info_header=$(eval $cmd_str 2> /dev/null |grep 'NAME ')
-  fi
-  
-  local res_info_command="$cmd_str 2> /dev/null |grep \"$name\""
-  local res_info_count=$(eval $res_info_command | wc -l)
+check_if_resource_type_support_namespace() {
+  local resource_type=$1
+  local resource_info_header=$(kubectl get $resource_type -A 2> /dev/null |grep 'NAMESPACE ')
 
-  if [ $res_info_count -eq 0 ]; then
-    echo -e "\n=== No ${type}s with '$name' in the name were found.\n"
-    exit 1
-  elif [ $res_info_count -gt 1 ]; then
-    echo -e "\n=== Found $res_info_count ${type}s with '$name' in their names: \n"
-    echo "    $res_info_header"
-    eval $res_info_command | nl -w2 -s ': ' |grep --color=always $name
-    
-    echo ""
-    while : ; do
-      read -p "=== Please choose one $type to $action [1~$res_info_count] or type 'q' to quit: " res_info_sequnce
-      if [ "$res_info_sequnce" == "q" ]; then
-        echo ""
-        exit 0
-      elif [[ $res_info_sequnce =~ ^[1-9][0-9]*$ ]] && [ $res_info_sequnce -le $res_info_count ]; then
-        break
-      fi
-    done
-    
-    local filtered_line=$(eval $res_info_command | nl -w2 -s ': ' |grep $name |grep "${res_info_sequnce}: ")
-    if [ $type_support_namespace -eq 1 ]; then
-      namespace=$(echo $filtered_line |awk '{print $2}')
-      res_name=$(echo $filtered_line |awk '{print $3}')
-    else
-      res_name=$(echo $filtered_line |awk '{print $2}')
-    fi
-    echo ""
+  [ "$resource_info_header" == "" ] && echo "false" || echo "true"
+}
+
+check_if_resource_type_supported_for_k8s_command() {
+  local provided_resource_type=$1
+  local supported_resource_types="${2//,/|}"
+  local involved_command="${@:3}"
+  
+  if [[ ! "$provided_resource_type" =~ ^($supported_resource_types)$ ]]; then
+    echo -e "=== [ERROR] Unsupported k8s resource type for command '$involved_command': [ $provided_resource_type ]"
+    exitscript
+  fi
+}
+
+distinct_num_array_and_sort() {
+  local num_array=$@
+  local result=$(echo "${num_array[@]}" | tr ' ' '\n' | sort -n | tr '\n' ' ')
+  echo $result
+}
+
+execute_command_immediately() {
+  local cmd_str="$1"
+  local custom_header=$(trim_str "$2")
+  local default_header="Command execution result"
+  
+  echo ""
+  echo "=== [INFO] About to execute following command: "
+  echo "    [ $cmd_str ]"
+  echo ""
+  if [ "$custom_header" == "" ]; then
+    echo "--------------------------------------- [ Command execution result ] ---------------------------------------"
   else
-    echo -e "\n=== Found 1 ${type} with '$name' in its name: \n"
-    echo "$res_info_header"
-    eval $res_info_command |grep --color=always "$name"
-    
-    echo ""
+    echo "----------------------------- [ $custom_header ] -----------------------------"
+  fi
+  echo ""
+  eval "$cmd_str"
+  echo ""
+}
+
+execute_command_after_wait_seconds() {
+  local wait_seconds=$1
+  local cmd_str="$2"
+  local custom_header=$(trim_str "$3")
+  local default_header="Command execution result"
+  
+  echo ""
+  echo "=== [INFO] About to execute following command in $wait_seconds seconds: "
+  echo "    [ $cmd_str ]"
+  echo ""
+  if [ "$custom_header" == "" ]; then
+    echo "--------------------------------------- [ Command execution result ] ---------------------------------------"
+  else
+    echo "----------------------------- [ $custom_header ] -----------------------------"
+  fi
+  echo ""
+  sleep $wait_seconds
+  eval "$cmd_str"
+  echo ""
+}
+
+exitscript() {
+  local pid=$$
+  local pid_query_count=$(ps -f | awk '{$1=$1;print}' | cut -d' ' -f 2 | grep ${pid} | wc -l)
+
+  if [ $pid_query_count -eq 1 ]; then
+    kill -SIGINT $$ && exit 1
+  fi
+}
+
+trim_str() {
+  echo "$@" | xargs
+}
+
+normlize_k8s_resource_type() {
+  local resource_type="${1,,}"
+  
+  local normalizd_type=""
+  case $resource_type in
+    apiservice|apiservices)
+        normalizd_type="apiservice"
+        ;;
+    certificatesigningrequest|certificatesigningrequests|csr)
+        normalizd_type="certificatesigningrequest"
+        ;;
+    clusterrole|clusterroles)
+        normalizd_type="clusterrole"
+        ;;
+    clusterrolebinding|clusterrolebindings)
+        normalizd_type="clusterrolebinding"
+        ;;
+    componentstatus|componentstatuses|cs)
+        normalizd_type="componentstatus"
+        ;;
+    configmap|configmaps|cm)
+        normalizd_type="configmap"
+        ;;
+    controllerrevision|controllerrevisions)
+        normalizd_type="controllerrevision"
+        ;;
+    cronjob|cronjobs|cj)
+        normalizd_type="cronjob"
+        ;;
+    csidriver|csidrivers)
+        normalizd_type="csidriver"
+        ;;
+    csinode|csinodes)
+        normalizd_type="csinode"
+        ;;
+    customresourcedefinition|customresourcedefinitions|crd|crds)
+        normalizd_type="customresourcedefinition"
+        ;;
+    daemonset|daemonsets|ds)
+        normalizd_type="daemonset"
+        ;;
+    deployment|deployments|deploy)
+        normalizd_type="deployment"
+        ;;
+    endpoints|ep)
+        normalizd_type="endpoints"
+        ;;
+    endpointslice|endpointslices)
+        normalizd_type="endpointslice"
+        ;;
+    event|events|ev)
+        normalizd_type="event"
+        ;;
+    horizontalpodautoscaler|horizontalpodautoscalers|hpa)
+        normalizd_type="horizontalpodautoscaler"
+        ;;
+    ingress|ingresses|ing)
+        normalizd_type="ingress"
+        ;;
+    ingressclass|ingressclasses)
+        normalizd_type="ingressclass"
+        ;;
+    job|jobs)
+        normalizd_type="job"
+        ;;
+    lease|leases)
+        normalizd_type="lease"
+        ;;
+    limitrange|limitranges|limits)
+        normalizd_type="limitrange"
+        ;;
+    mutatingwebhookconfiguration|mutatingwebhookconfigurations)
+        normalizd_type="mutatingwebhookconfiguration"
+        ;;
+    namespace|namespaces|ns)
+        normalizd_type="namespace"
+        ;;
+    networkpolicy|networkpolicies|netpol)
+        normalizd_type="networkpolicy"
+        ;;
+    node|nodes|no)
+        normalizd_type="node"
+        ;;
+    persistentvolume|persistentvolumes|pv)
+        normalizd_type="persistentvolume"
+        ;;
+    persistentvolumeclaim|persistentvolumeclaims|pvc)
+        normalizd_type="persistentvolumeclaim"
+        ;;
+    pod|pods|po)
+        normalizd_type="pod"
+        ;;
+    poddisruptionbudget|poddisruptionbudgets|pdb)
+        normalizd_type="poddisruptionbudget"
+        ;;
+    podsecuritypolicy|podsecuritypolicies|psp)
+        normalizd_type="podsecuritypolicy"
+        ;;
+    podtemplate|podtemplates)
+        normalizd_type="podtemplate"
+        ;;
+    priorityclass|priorityclasses|pc)
+        normalizd_type="priorityclass"
+        ;;
+    replicaset|replicasets|rs)
+        normalizd_type="replicaset"
+        ;;
+    replicationcontroller|replicationcontrollers|rc)
+        normalizd_type="replicationcontroller"
+        ;;
+    resourcequota|resourcequotas|quota)
+        normalizd_type="replicationcontroller"
+        ;;
+    role|roles)
+        normalizd_type="role"
+        ;;
+    rolebinding|rolebindings)
+        normalizd_type="rolebinding"
+        ;;
+    runtimeclass|runtimeclasses)
+        normalizd_type="runtimeclass"
+        ;;
+    secret|secrets)
+        normalizd_type="secret"
+        ;;
+    service|services|svc)
+        normalizd_type="service"
+        ;;
+    serviceaccount|serviceaccounts|sa)
+        normalizd_type="serviceaccount"
+        ;;
+    statefulset|statefulsets|sts)
+        normalizd_type="statefulset"
+        ;;
+    storageclass|storageclasses|sc)
+        normalizd_type="storageclass"
+        ;;
+    validatingwebhookconfiguration|validatingwebhookconfigurations)
+        normalizd_type="validatingwebhookconfiguration"
+        ;;
+    volumeattachment|volumeattachments)
+        normalizd_type="volumeattachment"
+        ;;
+    *)
+        >&2 echo "=== [ERROR] Invalid k8s resource type: [ $1 ]" && exitscript
+        ;;
+  esac
+  
+  echo $normalizd_type
+}
+
+remove_all_blanks_from_str() {
+  set -f
+  set -- $@
+  
+  printf '%s' $@
+  set +f
+}
+
+split_str_to_array() {
+  local str="$1"
+  local separator_char="$2"
+  
+  local cmd_str="awk -F'$separator_char' '{ for( i=1; i<=NF; i++ ) print \$i }' <<<\"$str\""
+  echo $(eval "$cmd_str")
+}
+
+resolve_base_command_of_list_resource_info() {
+  local resource_type=$1
+  
+  local result="kubectl get ${resource_type} -A"
+  case $resource_type in
+    node|pod|statefulset|persistentvolume|persistentvolumeclaim)
+        result="$result -o wide"
+        ;;
+  esac
+  echo "$result"
+}
+
+resolve_plural_form_of_resource_type() {
+  local resource_type=$1
+  
+  local result=""
+  if [ "$resource_type" == "endpoints" ]; then
+    result="endpoints"
+  elif [[ "$resource_type" =~ ^.*s$ ]]; then
+    result="${resource_type}es"
+  elif [[ "$resource_type" =~ ^.*y$ ]]; then
+    result="${resource_type%y*}ies"
+  else
+    result="${resource_type}s"
+  fi
+  
+  echo "$result"
+}
+
+resolve_resource_info_header() {
+  local resource_type=$1
+  local type_support_namespace=$2
+  
+  local result=$(eval $cmd_str 2> /dev/null |grep 'NAMESPACE ')
+  if [ $type_support_namespace == "false" ]; then
+    result=$(eval $cmd_str 2> /dev/null |grep 'NAME ')
+  fi
+  echo "$result"
+}
+
+resolve_resource_quantity_desc() {
+  local resource_type=$1
+  local resource_count=$2
+  
+  local result=""
+  if [ $resource_type == "endpoints" ]; then
+    result="$resource_count endpoints"
+  elif [ $resource_count -eq 1 ]; then
+    result="$resource_count $resource_type"
+  else
+    local plural_form_of_resource_type=$(resolve_plural_form_of_resource_type $resource_type)
+    result="$resource_count $plural_form_of_resource_type"
+  fi
+  
+  echo "$result"
+}
+
+resolve_tail_size() {
+  local default_tail_size=$1
+  local provided_tail_size=$2
+  
+  local result=""
+  if [ -z $provided_tail_size ]; then
+    result=$default_tail_size
+  elif [[ $provided_tail_size =~ ^[1-9][0-9]*$ ]]; then
+    result=$provided_tail_size
+  else
+    >&2 echo "=== [ERROR] Illegal value for optional argument 'tail_size': [$provided_tail_size]"
+    exitscript
+  fi
+  
+  echo $result
+}
+
+resolve_single_selected_k8s_resource() {
+  local resource_type=$1
+  local search_key=$2
+  local action_desc="${@:3}"
+  
+  local cmd_str=$(resolve_base_command_of_list_resource_info $resource_type)
+  local type_support_namespace=$(check_if_resource_type_support_namespace $resource_type)
+  local resource_info_header=$(resolve_resource_info_header $resource_type $type_support_namespace)
+
+  local list_resource_info_cmd="$cmd_str 2> /dev/null | grep -v NAME | grep \"$search_key\""
+  local found_resource_count=$(eval $list_resource_info_cmd | wc -l)
+  
+  local plural_form_of_resource_type=$(resolve_plural_form_of_resource_type $resource_type)
+  local resource_quantity_desc=$(resolve_resource_quantity_desc $resource_type $found_resource_count)
+  
+  local temp_desc=""
+  if [ $found_resource_count -eq 0 ]; then
+    >&2 echo -e "\n=== No $plural_form_of_resource_type with '$search_key' in name were found."
+    exitscript
+  elif [ $found_resource_count -eq 1 ]; then
+    temp_desc="its name"
+  else
+    temp_desc="their names"
+  fi
+
+  >&2 echo -e "\n=== Found $resource_quantity_desc with '$search_key' in $temp_desc: \n"
+  >&2 echo "    $resource_info_header"
+  eval "$list_resource_info_cmd" | nl -w2 -s ': ' | >&2 grep --color=always $search_key
+
+  local selected_seq_num=""
+  
+  >&2 echo ""
+  
+  if [ $found_resource_count -eq 1 ]; then
     while : ; do
-      read -n1 -p "=== Do you want to $action [y/n]? : " whether_continue
-      case $whether_continue in 
-        Y|y) 
-            echo ""
+      read -n1 -p "=== Do you want to $action_desc ? [y/n]: " whether_continue
+      case $whether_continue in
+        Y|y)
+            >&2 echo ""
             break
             ;;
-        N|n) 
-            echo -e "\n"
-            exit 0
+        N|n)
+            >&2 echo ""
+            exitscript
             ;;
-        *) 
-            echo ""
+        *)
+            >&2 echo ""
             ;;
       esac
     done
     
-    local filtered_line=$(eval $res_info_command |grep $name)
-    if [ $type_support_namespace -eq 1 ]; then
-      namespace=$(echo $filtered_line |awk '{print $1}')
-      res_name=$(echo $filtered_line |awk '{print $2}')
+    local filtered_line=$(eval $list_resource_info_cmd |grep $search_key)
+    if [ $type_support_namespace == "true" ]; then
+      local namespace=$(echo $filtered_line |awk '{print $1}')
+      local resource_name=$(echo $filtered_line |awk '{print $2}')
+      echo "$namespace/$resource_name"
     else
-      res_name=$(echo $filtered_line |awk '{print $1}')
+      local resource_name=$(echo $filtered_line |awk '{print $1}')
+      echo "$resource_name"
+    fi
+  else
+    while : ; do
+      read -p "=== Please choose one $resource_type to $action_desc [1~$found_resource_count] OR type 'q' to quit: " input_seq_num
+      if [ "$input_seq_num" == "q" ]; then
+        exitscript
+      elif [[ $input_seq_num =~ ^[1-9][0-9]*$ ]] && [ $input_seq_num -le $found_resource_count ]; then
+        break
+      fi
+    done
+    
+    local filtered_line=$(eval $list_resource_info_cmd | nl -w2 -s ': ' |grep $search_key |grep "${input_seq_num}: ")
+    
+    if [ $type_support_namespace == "true" ]; then
+      local namespace=$(echo $filtered_line |awk '{print $2}')
+      local resource_name=$(echo $filtered_line |awk '{print $3}')
+      echo "$namespace/$resource_name"
+    else
+      local resource_name=$(echo $filtered_line |awk '{print $2}')
+      echo "$resource_name"
+    fi
+  fi
+}
+
+resolve_multiple_selected_k8s_resources() {
+  local resource_type=$1
+  local search_key=$2
+  
+  local cmd_str=$(resolve_base_command_of_list_resource_info $resource_type)
+  local type_support_namespace=$(check_if_resource_type_support_namespace $resource_type)
+  local resource_info_header=$(resolve_resource_info_header $resource_type $type_support_namespace)
+
+  local list_resource_info_cmd="$cmd_str 2> /dev/null | grep -v NAME | grep \"$search_key\""
+  local found_resource_count=$(eval $list_resource_info_cmd | wc -l)
+  
+  local plural_form_of_resource_type=$(resolve_plural_form_of_resource_type $resource_type)
+  local resource_quantity_desc=$(resolve_resource_quantity_desc $resource_type $found_resource_count)
+
+  local temp_desc=""
+  if [ $found_resource_count -eq 0 ]; then
+    >&2 echo -e "\n=== No $plural_form_of_resource_type with '$search_key' in name were found."
+    exitscript
+  elif [ $found_resource_count -eq 1 ]; then
+    temp_desc="its name"
+  else
+    temp_desc="their names"
+  fi
+
+  >&2 echo -e "\n=== Found $resource_quantity_desc with '$search_key' in $temp_desc: \n"
+  >&2 echo "    $resource_info_header"
+  eval "$list_resource_info_cmd" | nl -w2 -s ': ' | >&2 grep --color=always $search_key
+
+  local final_seq_nums_array=()
+  
+  >&2 echo ""
+  while : ; do
+    read -p "=== Please select one or more $plural_form_of_resource_type (example: 1~2,4,5~7) to continue OR type 'q' to quit: " input_seq_nums_expr
+    
+    local input_seq_nums_expr=$(remove_all_blanks_from_str "$input_seq_nums_expr")
+    
+    local resolved_seq_array=()
+    if [ "$input_seq_nums_expr" == "q" ]; then
+      exitscript
+    elif [[ $input_seq_nums_expr =~ ^[1-9][0-9]*$ ]]; then
+      if [ $input_seq_nums_expr -le $found_resource_count ]; then
+        final_seq_nums_array=($input_seq_nums_expr)
+        break
+      fi
+    elif [[ $input_seq_nums_expr =~ ^[1-9][0-9]*~[1-9][0-9]*$ ]]; then
+      local splitted_array=($(split_str_to_array "$input_seq_nums_expr" "~"))
+      local start_num="${splitted_array[0]}"
+      local end_num="${splitted_array[1]}"
+
+      if [ $start_num -le $end_num -a $end_num -le $found_resource_count ]; then
+        final_seq_nums_array=( $(seq $start_num $end_num ) )
+        break
+      fi
+    elif [[ $input_seq_nums_expr =~ ^[1-9][0-9]*(,[1-9][0-9]*)+$ ]]; then
+      local splitted_array=($(split_str_to_array "$input_seq_nums_expr" ","))
+      local distinct_sorted_array=($(distinct_num_array_and_sort "${splitted_array[@]}"))
+      local max_seq_num="${distinct_sorted_array[${#distinct_sorted_array[@]} - 1]}"
+      
+      if [ $max_seq_num -le $found_resource_count ]; then
+        final_seq_nums_array=(${distinct_sorted_array[@]})
+        break
+      fi
+    elif [[ $input_seq_nums_expr =~ ^(([1-9][0-9]*)+(~([1-9][0-9]*)+)?)(,(([1-9][0-9]*)+(~([1-9][0-9]*)+)?))*$ ]]; then
+      local outer_splitted_array=($(split_str_to_array "$input_seq_nums_expr" ","))
+      
+      local input_seq_nums_expr_valid="true"
+      for item in ${outer_splitted_array[@]}; do
+        if [[ $item =~ ^[1-9][0-9]*$ ]]; then
+          if [ $item -le $found_resource_count ]; then
+            resolved_seq_array=(${resolved_seq_array[@]} $item)
+          else
+            input_seq_nums_expr_valid="false"
+            break
+          fi
+        elif [[ $item =~ ^[1-9][0-9]*~[1-9][0-9]*$ ]]; then
+          local item_splitted_array=($(split_str_to_array "$item" "~"))
+          local item_start_num="${item_splitted_array[0]}"
+          local item_end_num="${item_splitted_array[1]}"
+
+          if [ $item_start_num -le $item_end_num ] & [ $item_end_num -le $found_resource_count ]; then
+            local item_resolved_seq_array=( $(seq $item_start_num $item_end_num ) )
+            resolved_seq_array=(${resolved_seq_array[@]} ${item_resolved_seq_array[@]})
+          else
+            input_seq_nums_expr_valid="false"
+            break
+          fi
+        fi
+      done
+      
+      if [ "$input_seq_nums_expr_valid" = "true" ]; then
+        final_seq_nums_array=($(distinct_num_array_and_sort "${resolved_seq_array[@]}"))
+        break
+      fi
+    fi
+  done
+  
+  >&2 echo "=== The final specified seq nums are: [ ${final_seq_nums_array[@]} ]"
+  >&2 echo ""
+
+  local selected_resources=()
+  for seq_num in ${final_seq_nums_array[@]}; do
+    local filtered_line=$(eval $list_resource_info_cmd | nl -w2 -s ': ' |grep $search_key |grep "${seq_num}: ")
+    
+    if [ $type_support_namespace == "true" ]; then
+      local namespace=$(echo $filtered_line |awk '{print $2}')
+      local resource_name=$(echo $filtered_line |awk '{print $3}')
+      selected_resources=(${selected_resources[@]} "${namespace}/${resource_name}")
+    else
+      local resource_name=$(echo $filtered_line |awk '{print $2}')
+      selected_resources=(${selected_resources[@]} "${resource_name}")
     fi
     
-    echo ""
+  done
+  
+  echo "${selected_resources[@]}"
+}
+
+dump_resource_info_of_selected_k8s_resources() {
+  local resource_type=$1
+  local filter_key=$2
+  local dump_type=$3
+  local selected_k8s_resources=$4
+  
+  local plural_form_of_resource_type=$(resolve_plural_form_of_resource_type $resource_type)
+  local out_file_type="k8s-${dump_type}-of-${plural_form_of_resource_type}"
+  local output_dir_name="${out_file_type}_[filtered-by_${filter_key}]_$(date +'%Y-%m-%d_%H%M%S')"
+  local output_dir_path=$global_out_dir_path/$output_dir_name
+  
+  local output_tar_gz_file_name="${output_dir_name}.tar.gz"
+  local output_tar_gz_file_path=$global_out_dir_path/$output_tar_gz_file_name
+  mkdir -p $output_dir_path
+  
+  local type_support_namespace=$(check_if_resource_type_support_namespace $resource_type)
+  
+  local base_dump_cmd_str=""
+  if [ $dump_type == "describe" ]; then
+    base_dump_cmd_str="kubectl describe"
+  elif [ $dump_type == "logs" ]; then
+    base_dump_cmd_str="kubectl logs --tail=$tail_size"
+  else 
+    echo -e "[ERROR] Illegal dump type: [$dump_type]." && exitscript
   fi
+  
+  for item in ${selected_k8s_resources[@]}; do
+    local cmd_str="$base_dump_cmd_str"
+    
+    if [ "$type_support_namespace" == "true" ]; then
+      local temp_array=($(split_str_to_array "$item" "/"))
+      local namespace="${temp_array[0]}"
+      local namespace_dir_path="${output_dir_path}/namespace_[$namespace]"
+      mkdir -p $namespace_dir_path
+     
+      local resource_name="${temp_array[1]}"
+      local item_out_file_path="${namespace_dir_path}/${out_file_type}_${resource_name}_$(date +'%Y-%m-%d_%H%M%S').log"
+      echo "=== Dumping $dump_type of $resource_type [ $namespace/$resource_name ] ..."
+      
+      if [ "$namespace" != "default" ]; then
+        cmd_str="$cmd_str -n $namespace"
+      fi
+    else
+      local resource_name="$item"
+      local item_out_file_path="${output_dir_path}/${out_file_type}_${resource_name}_$(date +'%Y-%m-%d_%H%M%S').log"
+      echo "=== Dumping $dump_type of $resource_type [ $resource_name ] ..."
+    fi
+    
+    if [ $dump_type == "logs" -a $resource_type == "pod" ]; then
+      cmd_str="$cmd_str $resource_name > $item_out_file_path"
+    else
+      cmd_str="$cmd_str $resource_type/$resource_name > $item_out_file_path"
+    fi
+    
+    if [ $debug == "true" ]; then
+      echo "[DEBUG] Dump command: "
+      echo "        [ $cmd_str ]"
+      echo ""
+    fi
+    eval $cmd_str
+  done
+  
+  cd $global_out_dir_path
+  tar zcf $output_tar_gz_file_name $output_dir_name/
+  rm -rf $output_dir_path
+  
+  cd $SCRIPT_DIR
+  
+  echo ""
+  echo "=== All $dump_type of selected $plural_form_of_resource_type have been dumped, the result file:"
+  echo "    [ ${output_tar_gz_file_path} ]"
+  echo ""
 }
