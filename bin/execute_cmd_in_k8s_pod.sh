@@ -24,7 +24,7 @@ print_usage() {
   echo "# Execute command inside selected k8s pod filtered by specified [search_keyword]"
   echo "# "
   echo "# @author bianyun"
-  echo "# @version 1.1.0-SNAPSHOT"
+  echo "# @version 1.1.0"
   echo "# @date 2023/11/7"
   echo "================================================================================"
   echo ""

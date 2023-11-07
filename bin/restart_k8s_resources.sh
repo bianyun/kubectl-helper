@@ -27,7 +27,7 @@ print_usage() {
   echo "# Restart k8s resource filtered by specified [k8s_resource_type] and [search_keyword]"
   echo "# "
   echo "# @author bianyun"
-  echo "# @version 1.1.0-SNAPSHOT"
+  echo "# @version 1.1.0"
   echo "# @date 2023/11/7"
   echo "====================================================================================="
   echo ""

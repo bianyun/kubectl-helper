@@ -21,7 +21,7 @@ print_usage() {
   echo "# Setup aliases for most common used kubectl commands"
   echo "# "
   echo "# @author bianyun"
-  echo "# @version 1.1.0-SNAPSHOT"
+  echo "# @version 1.1.0"
   echo "# @date 2023/11/7"
   echo "====================================================="
   echo ""

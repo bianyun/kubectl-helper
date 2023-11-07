@@ -3,8 +3,8 @@ kubectl-helper is a set of scripts that encapsulate common kubectl commands and 
 
 ## 1. Install
 ```bash
-[root@localhost ~]# wget https://github.com/bianyun/kubectl-helper/releases/download/1.0.0/kubectl-helper_v1.0.0.tar.gz
-[root@localhost ~]# tar zxf kubectl-helper_v1.0.0.tar.gz
+[root@localhost ~]# wget https://github.com/bianyun/kubectl-helper/releases/download/1.1.0/kubectl-helper_v1.1.0.tar.gz
+[root@localhost ~]# tar zxf kubectl-helper_v1.1.0.tar.gz
 [root@localhost ~]# cd kubectl-helper
 [root@localhost kubectl-helper]# ls -l
 total 36
